@@ -15,10 +15,12 @@ class CropTypeDataset(Dataset):
         self,
         data_path,
         keys: dict,
+        bands=['vhvv', 'vh', 'vv'],
         transform=None
         ):
         
         self.path = data_path
+        self.bands = bands
         
         with xr.open_dataset(os.path.join(self.path)) as ds:
             self.len = len(ds['point_id'])
@@ -30,18 +32,16 @@ class CropTypeDataset(Dataset):
         return self.len
     
     def __getitem__(self, index):
+        series_data = []
         with xr.open_dataset(os.path.join(self.path)) as ds:
-            vhvv = ds.isel(point_id=index).vhvv.to_numpy()
-            vh = ds.isel(point_id=index).vh.to_numpy()
-            vv = ds.isel(point_id=index).vv.to_numpy()
+            for band in self.bands:    
+                series_data.append(ds.isel(point_id=index)[band].to_numpy())
             label = ds.isel(point_id=index).label.item()
-        
+            
         encoded = np.zeros(len(self.keys.keys()))
         encoded[self.keys[label]] = 1
         signals = np.vstack((
-            np.array(vh),
-            np.array(vv),
-            np.array(vhvv)
+            series_data
             ))
         
         return signals, encoded
