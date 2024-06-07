@@ -35,6 +35,7 @@ def add_labels(
         
 def generate_datasets(
     data: pd.DataFrame,
+    description: str='LUCAS and S1 SAR dataset'
 ):
     assert set(['POINT_ID', 'LABEL']) <= set(data.columns) # Check for labels 
     
@@ -56,7 +57,18 @@ def generate_datasets(
             point_id=point_ids,
             dates=dates
         ),
-        attrs=dict(description='SAR Bands'),
+        attrs=dict(description=description),
     )
     
     return ds
+
+def encode_labels(labels):
+    # Return dict mapping labels to one hot encoded indicies
+    labels = np.unique(labels)
+    keys = dict(zip(labels, np.arange(0, len(labels))))
+    
+    return keys
+
+def convert_label(encoded_vec, keys):
+    label = list(keys.keys())[int(np.where(encoded_vec == 1)[0].item())]
+    return label

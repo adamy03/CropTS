@@ -49,7 +49,6 @@ class CropTypeDataset(Dataset):
     def convert_label(self, encoded_vec):
         label = list(self.keys.keys())[int(np.where(encoded_vec == 1)[0].item())]
         return label
-
-def convert_label(encoded_vec, keys):
-    label = list(keys.keys())[int(np.where(encoded_vec == 1)[0].item())]
-    return label
+    
+    def get_ds(self):
+        return xr.open_dataset(os.path.join(self.path))
