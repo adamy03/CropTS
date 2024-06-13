@@ -1,5 +1,3 @@
-import sys
-from networkx import parse_graphml
 import torch
 import numpy as np
 import pickle as pkl
@@ -8,7 +6,6 @@ import argparse
 from torch.utils.data import DataLoader
 from data.dataset import *
 from data.data_utils import *
-from operator import length_hint
 from momentfm import MOMENTPipeline
 from tqdm import tqdm
 
@@ -17,22 +14,19 @@ torch.manual_seed(0)
 BATCH_SIZE = 64
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+parser = argparse.ArgumentParser(description='Train network.')
+parser.add_argument('--data_path', help='training file', required=True)
+parser.add_argument('--out_dir', default='./', help='output path', required=True)
+parser.add_argument('--out_name', default='outputs', help='output filename', required=False)
+
 def main():
     # Parser
-    parser = argparse.ArgumentParser(description='Train network.')
-    parser.add_argument('--data_path', help='training file', required=True)
-    parser.add_argument('--out_path', default='./', help='output path', required=True)
-    args = vars(parser.parse_args())
+    args = parser.parse_args()
     
     # load model
     model = load_model()
     
-    # generate dataset
-    with xr.open_dataset(args['data_path']) as ds:
-        labels = np.unique(ds.label)
-        keys = encode_labels(labels)
-    
-    ds = CropTypeDataset(args['data_path'], keys=keys)
+    ds = CropTypeDataset(args.data_path)
     data_loader = DataLoader(ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=2)
 
     # run model
@@ -48,7 +42,7 @@ def main():
         'labels': train_labels
     }
         
-    with open(os.path.join(args['out_path'], 'outputs.pkl'), 'wb') as f:
+    with open(os.path.join(args.out_dir, args.out_name+'.pkl'), 'wb') as f:
         pkl.dump(model_outputs, f)
         
     return 

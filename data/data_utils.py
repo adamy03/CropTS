@@ -4,12 +4,13 @@ import geopandas as gpd
 import numpy as np
 import pickle as pkl
 import os
+import h5py
 import xarray as xr
 
 from typing import Iterable
 from tqdm import tqdm
 
-def add_labels(
+def add_lucas_labels(
     signals: str, 
     labels: str,
 ):
@@ -33,9 +34,9 @@ def add_labels(
     
     return signals
         
-def generate_datasets(
+def generate_lucas_s1_dataset(
     data: pd.DataFrame,
-    description: str='LUCAS and S1 SAR dataset'
+    output_path: str,
 ):
     assert set(['POINT_ID', 'LABEL']) <= set(data.columns) # Check for labels 
     
@@ -46,22 +47,16 @@ def generate_datasets(
     labels = data['LABEL'].to_numpy()
     dates = np.array([x.split('_')[1] for x in data.columns[1:37]])
     
-    ds = xr.Dataset(
-        data_vars=dict(
-            vhvv=(['point_id', 'dates'], vhvv),
-            vv=(['point_id', 'dates'], vv),
-            vh=(['point_id', 'dates'], vh),
-            label=(['point_id'], labels)
-        ),
-        coords=dict(
-            point_id=point_ids,
-            dates=dates
-        ),
-        attrs=dict(description=description),
-    )
+    with h5py.File(output_path, 'w') as f:
+    # Create a dataset in the file
+        length = len(labels)
+        f.create_dataset('vhvv', (length, 36), data=vhvv)
+        f.create_dataset('vh', (length, 36), data=vh)
+        f.create_dataset('vv', (length, 36), data=vv)
+        f.create_dataset('point_id', (length), data=point_ids)
+        f.create_dataset('label', (length), data=labels)
+        f.create_dataset('date', (36), data=dates)
     
-    return ds
-
 def encode_labels(labels):
     # Return dict mapping labels to one hot encoded indicies
     labels = np.unique(labels)
@@ -72,3 +67,14 @@ def encode_labels(labels):
 def convert_label(encoded_vec, keys):
     label = list(keys.keys())[int(np.where(encoded_vec == 1)[0].item())]
     return label
+
+def load_data(
+    data_path: str,
+):
+    with h5py.File(data_path, 'r') as f:
+        keys = [key for key in f.keys()]
+        data = []
+        for key in keys:
+            data.append(f[key][:])
+            
+    return dict(zip(keys, data)) 

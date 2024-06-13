@@ -2,44 +2,52 @@ import numpy as np
 import pandas as pd
 import h5py
 import os
+import sys
 import torch
 import matplotlib.pyplot as plt
 import seaborn as sns
 import random
 import xarray as xr
 
+from .data_utils import *
 from torch.utils.data import Dataset
 
 class CropTypeDataset(Dataset):
     def __init__(
         self,
         data_path,
-        keys: dict,
+        keys: dict = None,
         bands=['vhvv', 'vh', 'vv'],
         transform=None
         ):
         
         self.path = data_path
         self.bands = bands
+        self.keys = keys
         
-        with xr.open_dataset(os.path.join(self.path)) as ds:
-            self.len = len(ds['point_id'])
+        with h5py.File(self.path, 'r') as f:
+            self.len = len(f['label'])
+            if self.keys is None:
+                labels = np.unique(f['label'])
+                self.keys = encode_labels(labels)
         
         self.transform = transform
-        self.keys = keys
         
     def __len__(self):
         return self.len
     
     def __getitem__(self, index):
         series_data = []
-        with xr.open_dataset(os.path.join(self.path)) as ds:
+        with h5py.File(self.path, 'r') as f:
             for band in self.bands:    
-                series_data.append(ds.isel(point_id=index)[band].to_numpy())
-            label = ds.isel(point_id=index).label.item()
+                series_data.append(f[band][index]) # Retrieve ts data for each band
+            label = f['label'][index]
             
-        encoded = np.zeros(len(self.keys.keys()))
+        # One hot encode label
+        encoded = np.zeros(len(self.keys.keys())) 
         encoded[self.keys[label]] = 1
+        
+        # Combine labels and data
         signals = np.vstack((
             series_data
             ))
