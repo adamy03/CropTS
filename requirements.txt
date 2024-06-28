@@ -1,0 +1,19 @@
+accelerate==0.31.0
+ee==0.4
+geemap==0.32.1
+h5py==3.11.0
+matplotlib==3.8.4
+# momentfm==0.1
+numpy==1.25.2
+pandas==2.2.2
+peft==0.11.1
+ray==2.31.0
+scikit_learn==1.4.2
+seaborn==0.13.2
+torch==2.0.1
+torch==2.3.0
+torchvision==0.18.0
+tqdm==4.66.4
+huggingface-hub==0.19.4
+transformers==4.33.3
+

@@ -15,40 +15,55 @@ from torch.utils.data import Dataset
 class CropTypeDataset(Dataset):
     def __init__(
         self,
-        data,
-        labels,
+        path,
+        subset='train',
         bands=None,
         seq_len=None,
-        transform=None
+        transform=None,
+        include_masks=False
     ):
-        self.bands = bands
         self.seq_len = seq_len
         self.transform = transform
-        self.data = data
-        self.labels = labels
+        self.bands = bands
+        self.include_masks = include_masks
         
-        self.keys = encode_labels(labels)
-        self.len = data.shape[0]
+        if not subset in ['train', 'val', 'test']:
+            raise ValueError('subset must be "train", "val", or "test"')
+
+        self.data = np.load(os.path.join(path, f'{subset}_signals.npy'), allow_pickle=True)
+        
+        if include_masks:
+            self.masks = np.load(os.path.join(path, f'{subset}_masks.npy'), allow_pickle=True)
+        
+        self.labels = np.load(os.path.join(path, f'{subset}_labels.npy'), allow_pickle=True)
+        self.no_unique_labels = len(np.unique(self.labels))
+        self.keys = dict(zip([i for i in np.unique(self.labels)], [np.identity(self.no_unique_labels)[i,:] for i in range(self.no_unique_labels)]))
+        self.labels = np.array([self.keys[label] for label in self.labels])
         
     def __len__(self):
-        return self.len
+        return self.data.shape[0]
     
     def __getitem__(self, index):
         if self.bands:
             data = self.data[index, self.bands, :]
         else:
-            data = self.data[index]
+            data = self.data[index, :, :]
         
         if self.seq_len:
             data = data[:, :self.seq_len]
-            
-        label = self.labels[index]
-
+        
+        data = torch.from_numpy(data.astype(np.float32))
+        label = torch.from_numpy(self.labels[index])
+        
         if self.transform:
             data = self.transform(data)
             label = self.transform(label)
-                        
-        return data, label
+        
+        if self.include_masks: 
+            mask = torch.from_numpy(self.masks[index])
+            return data, label, mask
+        else:                    
+            return data, label
 
     def convert_label(self, encoded_vec):
         label = list(self.keys.keys())[int(np.where(encoded_vec == 1)[0].item())]
@@ -57,7 +72,7 @@ class CropTypeDataset(Dataset):
     
     def get_keys(self, reversed=False):
         if reversed:
-            return {v: k for k, v in self.keys.items()}
+            return {np.argmax(v): k for k, v in self.keys.items()}
         else:
             return self.keys
     

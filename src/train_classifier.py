@@ -30,13 +30,13 @@ parser.add_argument('--lr', default=0.001, type=float, help='learning rate', req
 
 def main():
     args = parser.parse_args()
-    
+
     # Load Data
     print('Loading data...')
-    train_embeddings = np.load(os.path.join(args.data_path, 'train_embed.npy'))
-    train_labels = np.load(os.path.join(args.data_path, 'train_labels.npy'))
-    test_embeddings = np.load(os.path.join(args.data_path, 'test_embed.npy'))
-    test_labels = np.load(os.path.join(args.data_path, 'test_labels.npy'))
+    train_embeddings = np.load(os.path.join(args.data_path, '0_16_train_embed.npy'))
+    train_labels = np.load(os.path.join(args.data_path, '0_16_train_embed_labels.npy'))
+    test_embeddings = np.load(os.path.join(args.data_path, '0_16_test_embed.npy'))
+    test_labels = np.load(os.path.join(args.data_path, '0_16_test_embed_labels.npy'))
     
     train_ds = EmbeddingDataset(embeddings=train_embeddings, labels=train_labels)
     test_ds = EmbeddingDataset(embeddings=test_embeddings, labels=test_labels)
@@ -49,8 +49,9 @@ def main():
     model = CropTypeClassifier(
         input_dim=args.input_len,
         n_classes=train_labels.shape[1],
-        hidden_dim=512,
+        hidden_dim=args.hidden_dim,
     )
+    print(model)
     
     loss_fn = nn.CrossEntropyLoss()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -75,7 +76,7 @@ def main():
             'model': model.state_dict(),
             'optimizer': optimizer.state_dict(),
             'train_losses': train_losses,
-            'test_losses': test_losses
+            'test_losses': test_losses,
         }
         torch.save(state, os.path.join(args.save_path, args.test_name + '.pth'))
         

@@ -85,7 +85,8 @@ def encode_labels(labels):
     """
     # Return dict mapping labels to one hot encoded indicies
     labels = np.unique(labels)
-    keys = dict(zip(labels, np.arange(0, len(labels))))
+    encoded_vecs = np.identity(len(labels))
+    keys = dict(zip(labels, [encoded_vecs[i, :] for i in range(len(labels))]))
     
     return keys
 

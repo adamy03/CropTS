@@ -30,10 +30,9 @@ def main():
     n_classes = args.n_classes
     
     # Load data
-    transform = v2.ToTensor()
     data = np.load(os.path.join(args.data_path, 'train_signals.npy'))
     labels = np.load(os.path.join(args.data_path, 'train_labels.npy'))
-    ds = CropTypeDataset.load_data(data, labels, transform=transform)
+    ds = CropTypeDataset(data, labels, seq_len=16)
     data_loader = DataLoader(ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=2)
     
     if n_classes is None:
