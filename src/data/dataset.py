@@ -61,6 +61,10 @@ class CropTypeDataset(Dataset):
         
         if self.include_masks: 
             mask = torch.from_numpy(self.masks[index])
+            
+            if self.seq_len:
+                mask = mask[:, :self.seq_len]
+
             return data, label, mask
         else:                    
             return data, label
