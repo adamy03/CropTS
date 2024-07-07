@@ -1,5 +1,8 @@
 import ee
 import geemap
+import sys
+
+from .data_utils import *
 
 
 # =============S1-SAR================
@@ -42,7 +45,7 @@ def get_range_average(date_range, fc, bands=["VV", "VH"]):
     return temp_collection
 
 
-def generate_s1_averages(start_date, end_date, roi, step):
+def generate_s1_averages(roi, start_date, end_date, step):
     s1 = (
         ee.ImageCollection("COPERNICUS/S1_GRD")
         .filterMetadata("instrumentMode", "equals", "IW")
@@ -245,3 +248,53 @@ def extract_histar(roi, start_date, end_date, step):
     histar = ee.ImageCollection(histar).toBands()
 
     return histar
+
+
+def generate_fused(
+    roi,
+    start_date,
+    end_date,
+    step=10,
+    export_scale=10,
+):
+    lucas_subset =  (
+        ee.FeatureCollection('projects/ee-ayang115t/assets/lucas_2018_filtered_polygons')
+        .filterBounds(roi)
+    )
+    s1 = generate_s1_averages(roi, start_date, end_date, step)
+    histar = extract_histar(roi, start_date, end_date, step)
+
+    fused = s1.addBands(histar)
+    
+    to_export = fused.sampleRegions(
+        collection = lucas_subset,
+        properties = ['POINT_ID','stratum'],
+        tileScale = 16,
+        scale = export_scale,
+        geometries=False
+    )
+
+    fused_df = ee.data.computeFeatures({
+        'expression': to_export,
+        'fileFormat': 'PANDAS_DATAFRAME'
+    })
+    
+    labels = pd.read_csv('/scratch/bbug/ayang1/raw_data/lucas/lucas_2018/copernicus_filtered/lucas_2018_filtered.csv')
+    fused_df = add_lucas_labels(fused_df, labels)
+    fused_df.drop(['geo', 'POINT_ID'], axis=1, inplace=True)
+    fused_df = fused_df.loc[fused_df['LABEL']!='NOT_CROP']
+    
+    bands = ['B1', 'B2', 'B3', 'B4', 'B5', 'B7', 'VH', 'VV']
+    band_df = []
+    labels = fused_df['LABEL'].to_numpy()
+
+    for band in bands:
+        df = fused_df.loc[:, [i for i in filter(lambda x: band in x, fused_df.columns)]]
+        col_names = list(df.columns)
+        col_names.sort(key=lambda x: int(x.split('_')[0]))
+        df = df.reindex(col_names, axis=1)
+        band_df.append(np.expand_dims(df.to_numpy(), 1))
+        
+    data = np.concatenate(band_df, axis=1)
+    
+    return data, labels, to_export, fused_df

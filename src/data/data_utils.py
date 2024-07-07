@@ -9,8 +9,8 @@ from typing import Iterable
 from tqdm import tqdm
 
 def add_lucas_labels(
-    signals: str, 
-    labels: str,
+    signals, 
+    labels,
 ):
     """Adds LUCAS labels to SAR signals based on POINT_ID
 
