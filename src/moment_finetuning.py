@@ -68,13 +68,12 @@ class CropTypeTrainer:
         self.clf = None
         
         #=== Set model config ===
-        
         self.model = MOMENTPipeline.from_pretrained(
             "AutonLab/MOMENT-1-large", 
             model_kwargs={
                 'task_name': 'classification',
                 'n_channels': args.bands,
-                'num_class': len(test_ds.get_keys()),
+                'num_class': len(test_ds.labels[0]),
                 'freeze_encoder': False if self.args.mode == 'full_finetuning' else True,
                 'freeze_embedder': False if self.args.mode == 'full_finetuning' else True,
                 'reduction': self.args.reduction,
@@ -85,6 +84,8 @@ class CropTypeTrainer:
         )
         
         self.model.init()
+        
+        print(self.model)
         
         if self.args.from_checkpoint is not None:
             print('Loading checkpoint')

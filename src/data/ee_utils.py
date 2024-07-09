@@ -54,6 +54,7 @@ def generate_s1_averages(roi, start_date, end_date, step):
         .filterDate(start_date, end_date)
         .sort("system:time")
     )
+    
     s1 = s1.map(maskEdge)
     s1 = s1.map(toNatural)
 
@@ -257,6 +258,18 @@ def generate_fused(
     step=10,
     export_scale=10,
 ):
+    """Creates fused data, in order of bands 'B1', 'B2', 'B3', 'B4', 'B5', 'B7', 'VH', and 'VV'
+
+    Args:
+        roi (_type_): region to extract from 
+        start_date (_type_): _description_
+        end_date (_type_): _description_
+        step (int, optional): _description_. Defaults to 10.
+        export_scale (int, optional): _description_. Defaults to 10.
+
+    Returns:
+        _type_: _description_
+    """
     lucas_subset =  (
         ee.FeatureCollection('projects/ee-ayang115t/assets/lucas_2018_filtered_polygons')
         .filterBounds(roi)

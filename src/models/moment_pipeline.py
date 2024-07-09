@@ -4,7 +4,15 @@ import argparse
 import torch
 import numpy as np
 import pickle as pkl
-from torch.utils.data import DataLoader, random_split
+import torch
+from torch.utils.data import Dataset, DataLoader
+from tqdm import tqdm 
+from accelerate import Accelerator
+from peft import LoraConfig, get_peft_model
+from data.dataset import CropTypeDataset
+from models.moment_pipeline import *
+
+from argparse import Namespace
 
 torch.manual_seed(0)
 
@@ -17,7 +25,17 @@ from momentfm.models.statistical_classifiers import fit_svm
 from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report
+from argparse import Namespace
 
+def control_randomness(seed: int = 42):
+    random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    
 def load_moment(
     n_classes, 
     n_channels=3, 
