@@ -6,8 +6,14 @@ class CropClassifier:
     def __init__(self, args):
         self.args = args
         self.train_data, self.test_data, self.train_labels, self.test_labels = self.load_data()
-        self.train_data = self.train_data[:, :, :self.args.seq_len].mean(axis=1)
-        self.test_data = self.test_data[:, :, :self.args.seq_len].mean(axis=1)
+    
+        if self.args.agg == 'mean':
+            self.train_data = self.train_data[:, :, :self.args.seq_len].mean(axis=1)
+            self.test_data = self.test_data[:, :, :self.args.seq_len].mean(axis=1)
+        elif self.args.agg == 'concat':
+            self.train_data = self.train_data[:, :, :self.args.seq_len].reshape(self.train_data.shape[0], -1)
+            self.test_data = self.test_data[:, :, :self.args.seq_len].reshape(self.test_data.shape[0], -1)
+                        
         self.clf = None
         self.accuracy = None
         
@@ -57,6 +63,7 @@ if __name__ == '__main__':
     parser.add_argument("--mode", type=str, default="random_forest", help="Mode to run")
     parser.add_argument("--test_name", type=str, default="test", help="Name of the test")
     parser.add_argument("--seq_len", type=int, default=36, help="Length of input sequence")
+    parser.add_argument("--agg", type=str, default="mean", help="Aggregation method")
     args = parser.parse_args()
     
     classifier = CropClassifier(args)

@@ -63,11 +63,15 @@ class CropTypeTrainer:
                 print("LoRA enabled")
                 self.model.print_trainable_parameters()
 
+        self.accelerator = Accelerator(
+            project_dir=self.args.output_path, log_with="wandb"
+        )
+
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.args.init_lr)
         self.scheduler = torch.optim.lr_scheduler.OneCycleLR(
             self.optimizer,
             max_lr=self.args.max_lr,
-            total_steps=self.args.epochs * len(self.train_dataloader),
+            total_steps= self.accelerator.num_processes * self.args.epochs * len(self.train_dataloader)
         )
         # self.scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
         #     self.optimizer, 
@@ -76,9 +80,7 @@ class CropTypeTrainer:
         # self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer)
 
         ### Accelerator Init ###
-        self.accelerator = Accelerator(
-            project_dir=self.args.output_path, log_with="wandb"
-        )
+
 
         self.experiment_config = {
             "epochs": self.args.epochs,
@@ -91,15 +93,20 @@ class CropTypeTrainer:
             "optimizer": "Adam"
         }
         self.accelerator.init_trackers(
-            project_name=WANDB_PROJECT, config=self.experiment_config
+            project_name=WANDB_PROJECT, 
+            config=self.experiment_config, 
+            # init_kwargs={"wandb":{"name": f"{self.args.test_name}"}}
         )
 
         self.device = self.accelerator.device
-        self.model, self.optimizer, self.train_dataloader = self.accelerator.prepare(
+        self.model, self.optimizer, self.train_dataloader, self.scheduler = self.accelerator.prepare(
             self.model, 
             self.optimizer, 
-            self.train_dataloader
-            )
+            self.train_dataloader,
+            self.scheduler
+        )
+        
+        self.accelerator.register_for_checkpointing(self.scheduler)
 
         self.epoch = 0
         if self.args.from_checkpoint is not None:
@@ -224,7 +231,9 @@ class CropTypeTrainer:
         avg_loss = total_loss / len(self.train_dataloader)
         
         ### Log training metrics ###
-        self.log_metrics(avg_loss, None, phase="train")
+        if self.accelerator.is_main_process:
+            self.log_metrics(avg_loss, None, phase='train')
+
 
 #####################################evaluate loops#################################################
     def test(self):
@@ -278,11 +287,11 @@ class CropTypeTrainer:
         avg_loss = total_loss / len(dataloader)
         accuracy = total_correct / len(dataloader.dataset)
         
-        self.log_metrics(avg_loss, accuracy, phase=phase)
+        if self.accelerator.is_main_process:
+            self.log_metrics(avg_loss, accuracy, phase=phase)
 
 #################################Logging and Checkpoints###########################################
     def log_metrics(self, loss, accuracy, phase="train"):
-
 
         if phase == "train":
             self.accelerator.print(
