@@ -1,125 +1,64 @@
-import pickle as pkl
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-import os
-import sys
 import argparse
-import torch
+from models.model_utils import *
 
-torch.manual_seed(0)
-
-from models.classifier import *
-from torch.utils.data import DataLoader
-from data.data_utils import *
-from data.dataset import *
-from tqdm import tqdm
-
-sns.set_theme()
-cmap = sns.color_palette("tab10", as_cmap=True)
-
-parser = argparse.ArgumentParser(description='Classify embeddings')
-parser.add_argument('--data_path', help='path to embeddings', required=True)
-parser.add_argument('--save_path', default=None, help='path to save model', required=False)
-parser.add_argument('--test_name', default=None, help='name of test', required=False)
-parser.add_argument('--input_len', default=None, type=int, help='path to load model', required=False)
-parser.add_argument('--batch_size', default=32, type=int, help='batch size', required=False)
-parser.add_argument('--hidden_dim', default=512, type=int, help='hidden dimension', required=False)
-parser.add_argument('--epochs', default=100, type=int, help='number of epochs', required=False)
-parser.add_argument('--lr', default=0.001, type=float, help='learning rate', required=False)
-
-def main():
-    args = parser.parse_args()
-
-    # Load Data
-    print('Loading data...')
-    train_embeddings = np.load(os.path.join(args.data_path, '0_16_train_embed.npy'))
-    train_labels = np.load(os.path.join(args.data_path, '0_16_train_embed_labels.npy'))
-    test_embeddings = np.load(os.path.join(args.data_path, '0_16_test_embed.npy'))
-    test_labels = np.load(os.path.join(args.data_path, '0_16_test_embed_labels.npy'))
-    
-    train_ds = EmbeddingDataset(embeddings=train_embeddings, labels=train_labels)
-    test_ds = EmbeddingDataset(embeddings=test_embeddings, labels=test_labels)
-    
-    train_loader = DataLoader(train_ds, batch_size=args.batch_size)
-    test_loader = DataLoader(test_ds, batch_size=args.batch_size)
-    
-    # Model parameters
-    print('Loading model...')
-    model = CropTypeClassifier(
-        input_dim=args.input_len,
-        n_classes=train_labels.shape[1],
-        hidden_dim=args.hidden_dim,
-    )
-    print(model)
-    
-    loss_fn = nn.CrossEntropyLoss()
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    lr = args.lr
-    epochs = args.epochs
-    optim = torch.optim.Adam(model.parameters(), lr=lr) 
-
-    # Train Model
-    print('Training model...')
-    model, optimizer, train_losses, test_losses = train_classifier_head(
-        model,
-        loss_fn,
-        device,
-        optim,
-        epochs,
-        train_loader,
-        test_loader,
-    )
-    
-    if args.save_path:
-        state = {
-            'model': model.state_dict(),
-            'optimizer': optimizer.state_dict(),
-            'train_losses': train_losses,
-            'test_losses': test_losses,
-        }
-        torch.save(state, os.path.join(args.save_path, args.test_name + '.pth'))
+class CropClassifier:
+    def __init__(self, args):
+        self.args = args
+        self.train_data, self.test_data, self.train_labels, self.test_labels = self.load_data()
+        self.train_data = self.train_data[:, :, :self.args.seq_len].mean(axis=1)
+        self.test_data = self.test_data[:, :, :self.args.seq_len].mean(axis=1)
+        self.clf = None
+        self.accuracy = None
         
-def train_classifier_head(
-    model,
-    loss_fn,
-    device,
-    optim,
-    epochs,
-    train_loader,
-    test_loader,
-    ):
-    
-    model = model.to(device)
-    train_losses = []
-    test_losses = []
-    
-    for epoch in tqdm(range(epochs)):
-        train_epoch_loss = []
-        test_epoch_loss = []
-        model.train()
-        for idx, batch in enumerate(train_loader):
-            optim.zero_grad()
-            embedding, label = batch
-            embedding, label = embedding.to(device), label.to(device)
-            output = model(embedding)
-            loss = loss_fn(output, label)
-            loss.backward()
-            optim.step()
-            train_losses.append(loss.item())
+        if not os.path.exists(self.args.output_path):
+            os.makedirs(self.args.output_path)
+            
+        self.log_file = open(
+            os.path.join(self.args.output_path, f"{self.args.test_name}_log.txt"),
+            "w",
+        )
+        self.log_file.write(f"CropType training, mode: {self.args.mode}\n")
         
-        model.eval()
-        with torch.no_grad():
-            for idx, batch in enumerate(test_loader):
-                embedding, label = batch
-                embedding, label = embedding.to(device), label.to(device)
-                output = model(embedding)
-                loss = loss_fn(output, label)
-                test_losses.append(loss.item())
+    def load_data(self):
+        train_data = np.load(os.path.join(self.args.data_path, 'train_signals.npy'), allow_pickle=True)
+        test_data = np.load(os.path.join(self.args.data_path, 'test_signals.npy'), allow_pickle=True)
+        train_labels = np.load(os.path.join(self.args.data_path, 'train_labels.npy'), allow_pickle=True)
+        test_labels = np.load(os.path.join(self.args.data_path, 'test_labels.npy'),
+        allow_pickle=True)
+        
+        return train_data, test_data, train_labels, test_labels
+    
+    def train(self):
+        print("Training classifier...")
+        if self.args.mode == 'random_forest':
+            self.clf = train_rf(self.train_data, self.train_labels)
+            print("Model Params: ", self.clf.get_params())
+            self.log_file.write(f"Config: {str(self.clf.get_params())}\n")
+        else:
+            raise ValueError(f'Invalid mode: {self.args.mode}')
+    
+    def evaluate(self):
+        if self.clf is None:
+            raise ValueError('Run train beofre evaluating')
+        
+        print("Evaluating classifier...")
+        if self.args.mode == 'random_forest':
+            train_accuracy = self.clf.score(self.train_data, self.train_labels)
+            test_accuracy = self.clf.score(self.test_data, self.test_labels)
+            print("Train Accuracy: ", train_accuracy)
+            print("Test Accuracy: ", test_accuracy)
+            self.log_file.write(f"Accuracy: {test_accuracy}\n")
 
-        print(f'epoch: {epoch+1}, train loss: {np.mean(train_losses):.5f}, test_loss:{np.mean(test_losses):.5f}')
-    
-    return model, optim, train_losses, test_losses
-        
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data_path", type=str, default="data", help="Path to data")
+    parser.add_argument("--output_path", type=str, default="output", help="Path to output")
+    parser.add_argument("--mode", type=str, default="random_forest", help="Mode to run")
+    parser.add_argument("--test_name", type=str, default="test", help="Name of the test")
+    parser.add_argument("--seq_len", type=int, default=36, help="Length of input sequence")
+    args = parser.parse_args()
+    
+    classifier = CropClassifier(args)
+    classifier.train()
+    classifier.evaluate()

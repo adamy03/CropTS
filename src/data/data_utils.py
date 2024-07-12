@@ -148,15 +148,13 @@ def get_band_arrays(data, bands, sort_func=None):
     return band_data
 
 
-def dataset_split(data, labels, partition=[0.6, 0.1, 0.3]):
+def dataset_split(data, labels, stratify=None):
     """
-    Split the dataset into training, validation, and testing sets.
+    Split the dataset into training, validation, and testing sets. Proportions are roughly 60/10/30 respectively.
 
     Args:
         data (array-like): The input data.
         labels (array-like): The corresponding labels for the input data.
-        partition (list, optional): The partition ratios for training, validation, and testing sets.
-            Defaults to [0.6, 0.1, 0.3].
 
     Returns:
         dict: A dictionary containing the split dataset with the following keys:
@@ -167,13 +165,14 @@ def dataset_split(data, labels, partition=[0.6, 0.1, 0.3]):
             - 'test_signals': The testing data.
             - 'test_labels': The corresponding labels for the testing data.
     """
+
     train_signals, test_signals, train_labels, test_labels = train_test_split(
-        data, labels, test_size=partition[2], random_state=RANDOM_STATE,
-        stratify=np.unique(labels)
+        data, labels, test_size=0.3, random_state=RANDOM_STATE,
+        stratify=stratify
     )
     train_signals, val_signals, train_labels, val_labels = train_test_split(
-        train_signals, train_labels, test_size=partition[1], random_state=RANDOM_STATE,
-        stratify=np.unique(labels)
+        train_signals, train_labels, test_size=0.1, random_state=RANDOM_STATE,
+        stratify=stratify
     )
     
     assert len(train_signals) == len(train_labels)

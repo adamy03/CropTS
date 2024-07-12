@@ -10,7 +10,7 @@ from tqdm import tqdm
 from accelerate import Accelerator
 from peft import LoraConfig, get_peft_model
 from data.dataset import CropTypeDataset
-from models.moment_pipeline import *
+# from models.moment_pipeline import *
 
 from argparse import Namespace
 
@@ -194,8 +194,8 @@ def train_rf(data, labels):
     grid_search = GridSearchCV(
         rf,
         {
-            'n_estimators': [100, 150, 200],
-            'max_depth': [50, 100, 150, 200],
+            'n_estimators': [100, 150, 200, 250, 300],
+            'max_depth': [100, 150, 200, 250, 300],
         },
         cv=5,
         n_jobs=10,
