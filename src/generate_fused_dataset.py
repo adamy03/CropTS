@@ -1,8 +1,6 @@
 import pandas as pd
 import numpy as np
-import torch
 import ee
-import sys
 import os
 
 from data.ee_utils import *
@@ -12,70 +10,113 @@ from data.dataset import *
 ee.Initialize()
 ee.Authenticate()
 
+def split_region(provinces, n):
+    subset_geoms = []
+    size = provinces.size().getInfo()
+    step = size // n
+    
+    for i in range(n):
+        start = i * step
+        end = (i + 1) * step if i < n - 1 else size
+        subset_geom = ee.FeatureCollection(provinces.slice(start, end))
+        subset_geoms.append(subset_geom)
+    
+    return subset_geoms
+
+
 if __name__ == "__main__":
     start_date = "2018-01-01"
     end_date = "2019-01-01"
-    year = "2018"
     step = 10  # Days to step for averages
     export_scale = 30
+    save_path = "/scratch/bbug/ayang1/datasets/lucas_fused/csvs"
     GAUL0 = ee.FeatureCollection("FAO/GAUL/2015/level0")
     GAUL1 = ee.FeatureCollection("FAO/GAUL/2015/level1")
 
-    # countries = [
-    #     'Austria', 'Belgium', 'Bulgaria', 'Croatia', 'Republic of Cyprus', 'Czech Republic', 'Denmark', 'Estonia', 'Finland', 'France', 'Germany', 'Greece', 'Hungary', 'Ireland', 'Italy', 'Latvia', 'Lithuania', 'Luxembourg', 'Malta', 'Netherlands', 'Poland', 'Portugal', 'Romania', 'Slovakia', 'Slovenia', 'Spain', 'Sweden'
-    # ]
-    countries = ["Estonia", "Finland", "France", "Poland", "Romania", "Spain", "Sweden"]
+    countries = [
+        # "Austria",
+        # "Belgium",
+        # "Bulgaria",
+        # "Croatia",
+        "Cyprus", # Failed 
+        # "Czech Republic",
+        # "Denmark",
+        "Estonia", # Failed
+        # "Finland",
+        # "France", 
+        # "Germany", 
+        # "Greece",
+        # "Hungary",
+        # "Ireland",
+        # "Italy",
+        # "Latvia",
+        # "Lithuania",
+        # "Luxembourg",
+        # "Malta",
+        # "Netherlands",
+        "Poland", # Failed
+        # "Portugal",
+        # "Romania",
+        # "Slovakia",
+        # "Slovenia",
+        "Spain", # Failed
+        # "Sweden",
+    ]
 
     for country in tqdm(countries):
         print(f"Generating datset for {country}")
+        filename = os.path.join(save_path, f"fused_{country}.csv")
 
-        provinces = GAUL1.filter(ee.Filter.eq("ADM0_NAME", country))
-        provinces = provinces.toList(provinces.size().getInfo())
+        if os.path.isfile(filename):
+            print(f"{filename} exists, skipping...")
+            continue
 
-        subset1_geom = ee.FeatureCollection(
-            provinces.slice(0, int(0.25 * provinces.size().getInfo()))
-        )
-        subset2_geom = ee.FeatureCollection(
-            provinces.slice(
-                int(0.25 * provinces.size().getInfo()),
-                int(0.5 * provinces.size().getInfo()),
+        try:
+            roi = GAUL0.filter(ee.Filter.eq("ADM0_NAME", country))
+            _, _, _, fused_df = generate_fused(
+                roi.geometry(),
+                start_date,
+                end_date,
+                step,
+                export_scale=export_scale,
+                geometries=True,
             )
-        )
-        subset3_geom = ee.FeatureCollection(
-            provinces.slice(
-                int(0.25 * provinces.size().getInfo()),
-                int(0.5 * provinces.size().getInfo()),
-            )
-        )
-        subset4_geom = ee.FeatureCollection(
-            provinces.slice(int(0.75 * provinces.size().getInfo()))
-        )
 
-        count = 0
-        for roi in [subset1_geom, subset2_geom, subset3_geom, subset4_geom]:
-            try:
-                count += 1
-                data, labels, ee_asset, fused_df = generate_fused(
-                    roi.geometry(),
-                    start_date,
-                    end_date,
-                    step,
-                    export_scale=export_scale,
-                )
-                fused_df["country"] = country
-                fused_df = fused_df.loc[fused_df["LABEL"] != "NOT_CROP"]
+            fused_df["country"] = country
+            fused_df.to_csv(filename)
+            print(f"created dataset for {country} with length {len(fused_df)}")
 
-                filename = f"/scratch/bbug/ayang1/datasets/lucas_fused/csvs/fused_{country}_subset{count}.csv"
-
-                if not os.path.isfile(filename):
-                    fused_df.to_csv(filename)
-                    print(
-                        f"created subset {count} for {country} with dataset length {len(fused_df)}"
-                    )
-
-                else:
+        except Exception as exception:
+            print(f"Failed for {country} with error {exception}. Attempting subsets...")
+            curr = 0
+            
+            provinces = GAUL1.filter(ee.Filter.eq("ADM0_NAME", country))
+            provinces = provinces.toList(provinces.size().getInfo())
+            provinces = split_region(provinces, 10)
+                
+            for count, subset in enumerate(provinces):
+                curr = count
+                
+                filename = os.path.join(save_path, f"fused_{country}_subset_{count}.csv")
+                
+                if os.path.isfile(filename):
                     print(f"{filename} exists, skipping...")
+                else:
+                    try:
+                        _, _, _, fused_df = generate_fused(
+                            subset,
+                            start_date,
+                            end_date,
+                            step,
+                            export_scale=export_scale,
+                            geometries=True,
+                        )
 
-            except Exception as exception:
-                print(f"{country} failed for subset {count} with error {exception}")
-                continue
+                        fused_df["country"] = country
+                        fused_df.to_csv(filename)
+                        print(f"created subset {count} for {country} with length {len(fused_df)}")
+
+                    except Exception as exception:
+                        print(f"{country} failed for subset {curr} with error {exception}")
+                        print(f"failed regions: {[feature['properties']['ADM1_NAME'] for feature in subset.getInfo()['features']]}")
+                        continue

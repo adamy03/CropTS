@@ -66,6 +66,29 @@ def test_linear_accuracy(model, test_loader, device='cpu', show_bar=False):
     return float(acc / steps)
 
 def load_accelerator_model(config, accelerator_model_path, device='cpu'):
+    """
+    Sample config:
+    config = {
+        "task_name": "classification", 
+        "model_name": "MOMENT", 
+        "transformer_type": "encoder_only", 
+        "d_model": None, 
+        "seq_len": 512, 
+        "patch_len": 8, 
+        "patch_stride_len": 8, 
+        "device": "cpu", 
+        "transformer_backbone": "google/flan-t5-large", 
+        "n_channels": 7,
+        "num_class": 12,
+        "freeze_encoder": False,
+        "freeze_embedder": False,
+        "reduction": 'concat',
+        "enable_gradient_checkpointing": False
+    }
+
+    config = Namespace(**config)
+    m2 = MOMENT(config)
+    """
     model = MOMENT(config)
     with open(accelerator_model_path, 'rb') as f:
         model.load_state_dict(torch.load(f, map_location=torch.device(device))['module'])

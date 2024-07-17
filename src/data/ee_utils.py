@@ -257,6 +257,7 @@ def generate_fused(
     end_date,
     step=10,
     export_scale=10,
+    geometries=True
 ):
     """Creates fused data, in order of bands 'B1', 'B2', 'B3', 'B4', 'B5', 'B7', 'VH', and 'VV'
 
@@ -284,7 +285,7 @@ def generate_fused(
         properties = ['POINT_ID','stratum'],
         tileScale = 16,
         scale = export_scale,
-        geometries=False
+        geometries = geometries
     )
 
     fused_df = ee.data.computeFeatures({
@@ -294,8 +295,6 @@ def generate_fused(
     
     labels = pd.read_csv('/scratch/bbug/ayang1/raw_data/lucas/lucas_2018/copernicus_filtered/lucas_2018_filtered.csv')
     fused_df = add_lucas_labels(fused_df, labels)
-    fused_df.drop(['geo', 'POINT_ID'], axis=1, inplace=True)
-    fused_df = fused_df.loc[fused_df['LABEL']!='NOT_CROP']
     
     bands = ['B1', 'B2', 'B3', 'B4', 'B5', 'B7', 'VH', 'VV']
     band_df = []

@@ -35,13 +35,13 @@ LUCAS2018_LEVEL2_CODES = {
     'B75': 'Other fruit trees and berries',
     'B76': 'Oranges',
     'B77': 'Other citrus fruit',
-    'B80': 'Olive groves',
+    'B81': 'Olive groves',
     'B82': 'Vineyards',
     'B83': 'Nurseries',
     'B84': 'Permanent industrial crops'
 }
 
-LUCAS2018_LEVEL2_CODES = {
+LUCAS2018_LEVEL1_CODES = {
     'B1': 'Cereals',
     'B2': 'Root crops',
     'B3': 'Non permanent industrial crops',
@@ -50,3 +50,33 @@ LUCAS2018_LEVEL2_CODES = {
     'B7': 'Permanent crops: fruits trees',
     'B8': 'Other permanent crops'
 }
+
+EU_MEMBER_STATES = [
+    "Austria",
+    "Belgium",
+    "Bulgaria",
+    "Croatia",
+    "Cyprus", 
+    "Czech Republic",
+    "Denmark",
+    "Estonia",
+    "Finland",
+    "France",
+    "Germany",
+    "Greece",
+    "Hungary",
+    "Ireland",
+    "Italy",
+    "Latvia",
+    "Lithuania",
+    "Luxembourg",
+    "Malta",
+    "Netherlands",
+    "Poland",
+    "Portugal",
+    "Romania",
+    "Slovakia",
+    "Slovenia",
+    "Spain",
+    "Sweden",
+]

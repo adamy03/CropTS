@@ -225,7 +225,7 @@ class CropTypeTrainer:
             self.log_metrics(avg_loss, None, phase='train')
 
 
-#####################################evaluate loops#################################################
+#####################################Evaluate Loops#################################################
     def test(self):
         self.evaluate_epoch(phase="test")
 
