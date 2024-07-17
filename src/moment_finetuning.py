@@ -61,7 +61,7 @@ class CropTypeTrainer:
 
         ### Accelerator Init ###
         self.accelerator = Accelerator(
-            project_dir=self.args.output_path, log_with="wandb"
+            project_dir=self.args.output_path, log_with="wandb" if self.args.log else None
         )
 
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.args.init_lr)
@@ -70,11 +70,6 @@ class CropTypeTrainer:
             max_lr=self.args.max_lr,
             total_steps=self.args.epochs * len(self.train_dataloader)
         )
-        # self.scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-        #     self.optimizer, 
-        #     T_0=1, T_mult=2
-        # )
-        # self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer)
 
         self.experiment_config = {
             "epochs": self.args.epochs,
@@ -90,7 +85,7 @@ class CropTypeTrainer:
         self.accelerator.init_trackers(
             project_name=WANDB_PROJECT, 
             config=self.experiment_config, 
-            # init_kwargs={"wandb":{"name": f"{self.args.test_name}"}}
+            init_kwargs={"wandb":{"name": f"{self.args.test_name}"}} if self.args.log else None
         )
 
         self.device = self.accelerator.device
@@ -115,12 +110,13 @@ class CropTypeTrainer:
         if not os.path.exists(self.args.output_path):
             os.makedirs(self.args.output_path)
             
-        self.log_file = open(
-            os.path.join(self.args.output_path, f"{self.args.test_name}_log.txt"),
-            "w",
-        )
-        self.log_file.write(f"CropType training, mode: {self.args.mode}\n")
-        self.log_file.write(f"Config: {str(self.args)}\n")
+        if self.args.log:
+            self.log_file = open(
+                os.path.join(self.args.output_path, f"{self.args.test_name}_log.txt"),
+                "w",
+            )
+            self.log_file.write(f"CropType training, mode: {self.args.mode}\n")
+            self.log_file.write(f"Config: {str(self.args)}\n")
 
     def load_datasets(self):
         train_ds = CropTypeDataset(
@@ -225,7 +221,7 @@ class CropTypeTrainer:
         avg_loss = total_loss / len(self.train_dataloader)
         
         ### Log training metrics ###
-        if self.accelerator.is_main_process:
+        if self.accelerator.is_main_process and self.args.log:
             self.log_metrics(avg_loss, None, phase='train')
 
 
@@ -281,7 +277,7 @@ class CropTypeTrainer:
         avg_loss = total_loss / len(dataloader)
         accuracy = total_correct / len(dataloader.dataset)
         
-        if self.accelerator.is_main_process:
+        if self.accelerator.is_main_process and self.args.log:
             self.log_metrics(avg_loss, accuracy, phase=phase)
 
 #################################Logging and Checkpoints###########################################
@@ -332,11 +328,12 @@ if __name__ == "__main__":
     # training parameters
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--epochs", type=int, default=5)
-    parser.add_argument("--mode", type=str, default="full_finetuning", help="choose from linear_probing, full_finetuning")
+    parser.add_argument("--mode", type=str, default="full_finetuning or linear_probing", help="choose from linear_probing, full_finetuning")
     parser.add_argument("--init_lr", type=float, default=1e-6)
     parser.add_argument("--max_lr", type=float, default=1e-4)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--lora", action="store_true", help="enable LoRA")
+    parser.add_argument("--log", action="store_true", help="enable logging")
     parser.add_argument("--reduction", type=str, default="concat", help="reduction method for MOMENT embeddings, choose from mean, concat, or max")
     parser.add_argument("--data_path", type=str, help="path to crop dataset")
     parser.add_argument("--output_path", type=str, help="path to save trained model and logs")
