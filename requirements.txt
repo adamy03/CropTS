@@ -4,8 +4,8 @@ earthengine-api
 matplotlib
 numpy
 pandas
+geopandas
 peft
-ray
 scikit_learn
 seaborn
 torch

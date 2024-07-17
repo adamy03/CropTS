@@ -3,15 +3,11 @@ import argparse
 import random
 import numpy as np
 import os
-import pdb
-import pickle
-import wandb
 
 from momentfm import MOMENTPipeline
 from data.dataset import CropTypeDataset
 from models.model_utils import *
-from torch.utils.data import Dataset, DataLoader
-from torchmetrics import Accuracy
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 from accelerate import Accelerator
 from peft import LoraConfig, get_peft_model
@@ -63,6 +59,7 @@ class CropTypeTrainer:
                 print("LoRA enabled")
                 self.model.print_trainable_parameters()
 
+        ### Accelerator Init ###
         self.accelerator = Accelerator(
             project_dir=self.args.output_path, log_with="wandb"
         )
@@ -71,16 +68,13 @@ class CropTypeTrainer:
         self.scheduler = torch.optim.lr_scheduler.OneCycleLR(
             self.optimizer,
             max_lr=self.args.max_lr,
-            total_steps= self.accelerator.num_processes * self.args.epochs * len(self.train_dataloader)
+            total_steps=self.args.epochs * len(self.train_dataloader)
         )
         # self.scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
         #     self.optimizer, 
         #     T_0=1, T_mult=2
         # )
         # self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer)
-
-        ### Accelerator Init ###
-
 
         self.experiment_config = {
             "epochs": self.args.epochs,
@@ -92,6 +86,7 @@ class CropTypeTrainer:
             "scheduler": str(self.scheduler),
             "optimizer": "Adam"
         }
+        
         self.accelerator.init_trackers(
             project_name=WANDB_PROJECT, 
             config=self.experiment_config, 
@@ -105,7 +100,6 @@ class CropTypeTrainer:
             self.train_dataloader,
             self.scheduler
         )
-        
         self.accelerator.register_for_checkpointing(self.scheduler)
 
         self.epoch = 0
