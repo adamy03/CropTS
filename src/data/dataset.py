@@ -5,12 +5,8 @@ import os
 import sys
 import torch
 import torchvision.transforms as transforms
-import matplotlib.pyplot as plt
-import seaborn as sns
-import random
-
-from .data_utils import *
 from torch.utils.data import Dataset
+from .classes import BANDS, LUCAS_10_CLASSES
 
 class CropTypeDataset(Dataset):
     def __init__(
@@ -24,30 +20,49 @@ class CropTypeDataset(Dataset):
     ):
         self.seq_len = seq_len
         self.transform = transform
-        self.bands = bands
         self.include_masks = include_masks
+        
+        self.bands = bands
+        if not bands:
+            self.bands = BANDS
         
         if not subset in ['train', 'val', 'test']:
             raise ValueError('subset must be "train", "val", or "test"')
 
-        self.data = np.load(os.path.join(path, f'{subset}_signals.npy'), allow_pickle=True)
+        # Dataset
+        self.dataset = pd.read_csv(os.path.join(path, f'{subset}.csv'))
         
+        # Masks
         if include_masks:
             self.masks = np.load(os.path.join(path, f'{subset}_masks.npy'), allow_pickle=True)
         
-        self.labels = np.load(os.path.join(path, f'{subset}_labels.npy'), allow_pickle=True)
+        # Labels
+        self.labels = self.dataset['LABEL'].values
         self.no_unique_labels = len(np.unique(self.labels))
-        self.keys = dict(zip([i for i in np.unique(self.labels)], [np.identity(self.no_unique_labels)[i,:] for i in range(self.no_unique_labels)]))
+        self.keys = LUCAS_10_CLASSES
         self.labels = np.array([self.keys[label] for label in self.labels])
+        
+        # Band data
+        band_data = []
+        for band in self.bands:
+            band_df = self.dataset.loc[:, self.dataset.columns.str.contains(band)]
+            
+            if len(band_df.columns) == 0:
+                raise ValueError(f'Band {band} not found in dataset')
+            
+            cols = list(band_df.columns)
+            cols.sort(key=lambda x: int(x.split('_')[0]))
+            band_df = band_df.reindex(cols, axis=1)
+            band_data.append(band_df.to_numpy()[:, np.newaxis, :])
+            
+        self.data = np.concatenate(band_data, axis=1)
+        self.country = self.dataset['country'].values
         
     def __len__(self):
         return self.data.shape[0]
     
     def __getitem__(self, index):
-        if self.bands:
-            data = self.data[index, self.bands, :]
-        else:
-            data = self.data[index, :, :]
+        data = self.data[index]
         
         if self.seq_len:
             data = data[:, :self.seq_len]
@@ -91,5 +106,4 @@ class EmbeddingDataset(Dataset):
     
     def __getitem__(self, index):
         return torch.Tensor(self.embeddings[index]), torch.Tensor(self.labels[index])
-    
     

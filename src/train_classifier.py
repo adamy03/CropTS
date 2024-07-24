@@ -1,6 +1,8 @@
 import numpy as np
+import pickle as pkl
 import argparse
 from models.model_utils import *
+from data.classes import BANDS
 
 class CropClassifier:
     def __init__(self, args):
@@ -27,11 +29,13 @@ class CropClassifier:
         self.log_file.write(f"CropType training, mode: {self.args.mode}\n")
         
     def load_data(self):
-        train_data = np.load(os.path.join(self.args.data_path, 'train_signals.npy'), allow_pickle=True)
-        test_data = np.load(os.path.join(self.args.data_path, 'test_signals.npy'), allow_pickle=True)
-        train_labels = np.load(os.path.join(self.args.data_path, 'train_labels.npy'), allow_pickle=True)
-        test_labels = np.load(os.path.join(self.args.data_path, 'test_labels.npy'),
-        allow_pickle=True)
+        train_df = pd.read_csv(os.path.join(self.args.data_path, 'train.csv'))
+        train_labels = train_df['LABEL'].values
+        train_data = self.load_bands(train_df)
+        
+        test_df = pd.read_csv(os.path.join(self.args.data_path, 'test.csv'))
+        test_labels = test_df['LABEL'].values
+        test_data = self.load_bands(test_df)
         
         return train_data, test_data, train_labels, test_labels
     
@@ -55,6 +59,32 @@ class CropClassifier:
             print("Train Accuracy: ", train_accuracy)
             print("Test Accuracy: ", test_accuracy)
             self.log_file.write(f"Accuracy: {test_accuracy}\n")
+        
+    def checkpoint(self):
+        if self.clf is None:
+            raise ValueError('Run train beofre saving')
+        
+        print("Saving classifier...")
+        if self.args.mode == 'random_forest':
+            with open(os.path.join(self.args.output_path, f'{self.args.test_name}_model.pkl'),'wb') as f:
+                pkl.dump(self.clf,f)
+        self.log_file.close()
+    
+    @staticmethod
+    def load_bands(dataset):
+        band_data = []
+        for band in BANDS:
+            band_df = dataset.loc[:, dataset.columns.str.contains(band)]
+            
+            if len(band_df.columns) == 0:
+                raise ValueError(f'Band {band} not found in dataset')
+            
+            cols = list(band_df.columns)
+            cols.sort(key=lambda x: int(x.split('_')[0]))
+            band_df = band_df.reindex(cols, axis=1)
+            band_data.append(band_df.to_numpy()[:, np.newaxis, :])
+            
+        return np.concatenate(band_data, axis=1)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -69,3 +99,4 @@ if __name__ == '__main__':
     classifier = CropClassifier(args)
     classifier.train()
     classifier.evaluate()
+    classifier.checkpoint()

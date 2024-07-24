@@ -119,27 +119,34 @@ class CropTypeTrainer:
             self.log_file.write(f"Config: {str(self.args)}\n")
 
     def load_datasets(self):
+        # self.bands = ['B1', 'B2', 'B3', 'B4', 'B5', 'B7'] #'VH', 'VV']
+        self.bands = ['VH', 'VV']
+            
         train_ds = CropTypeDataset(
             path=self.args.data_path,
             subset="train",
-            bands=None,
+            bands=self.bands,
             seq_len=self.args.seq_len,
             include_masks=self.args.masked,
         )
         val_ds = CropTypeDataset(
             path=self.args.data_path,
             subset="val",
-            bands=None,
+            bands=self.bands,
             seq_len=self.args.seq_len,
             include_masks=self.args.masked,
         )
         test_ds = CropTypeDataset(
             path=self.args.data_path,
             subset="test",
-            bands=None,
+            bands=self.bands,
             seq_len=self.args.seq_len,
             include_masks=self.args.masked,
         )
+        
+        assert train_ds.bands == val_ds.bands == test_ds.bands
+        
+        print('BANDS: ', train_ds.bands)
 
         return train_ds, val_ds, test_ds
 
@@ -148,7 +155,7 @@ class CropTypeTrainer:
             "AutonLab/MOMENT-1-large",
             model_kwargs={
                 "task_name": "classification",
-                "n_channels": args.bands,
+                "n_channels": self.args.bands,
                 "num_class": len(self.test_dataloader.dataset.labels[0]),
                 "freeze_encoder": False
                 if self.args.mode == "full_finetuning"
@@ -338,10 +345,10 @@ if __name__ == "__main__":
     parser.add_argument("--data_path", type=str, help="path to crop dataset")
     parser.add_argument("--output_path", type=str, help="path to save trained model and logs")
     parser.add_argument("--seq_len", type=int, default=512, help="sequence length for each sample, currently only support 512 for MOMENT")
-    parser.add_argument("--bands", type=int, default=2, help="number of bands for input data")
     parser.add_argument("--test_name", type=str, default="moment_classification", help="name of the test. will be used as checkpoint name")
     parser.add_argument("--from_checkpoint", type=str, default=None, help="path to model checkpoint")
-    parser.add_argument("--masked", type=bool, default=False, help="train on masked")
+    parser.add_argument("--masked", action="store_true", help="train on masked")
+    parser.add_argument("--bands", type=int, default=8, help="number of bands in the dataset")
 
     args = parser.parse_args()
     control_randomness(args.seed)

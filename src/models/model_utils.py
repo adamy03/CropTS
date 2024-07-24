@@ -1,10 +1,18 @@
 import os
+from matplotlib import figure
 import torch
 import numpy as np
 import torch
+import random
+import sys
+import matplotlib.pyplot as plt
+import seaborn as sns
 
+sys.path.append('../')
 torch.manual_seed(0)
+sns.set_style()
 
+from sklearn.metrics import confusion_matrix
 from data.data_utils import *
 from data.dataset import *
 from tqdm import tqdm  
@@ -87,12 +95,30 @@ def load_accelerator_model(config, accelerator_model_path, device='cpu'):
     }
 
     config = Namespace(**config)
-    m2 = MOMENT(config)
     """
     model = MOMENT(config)
     with open(accelerator_model_path, 'rb') as f:
         model.load_state_dict(torch.load(f, map_location=torch.device(device))['module'])
     
-    return model
+    return model  
+    
+def confusion_plot(pred, true, labels, title):
+    cf_matrix = confusion_matrix(
+        true,
+        pred
+        )
+    
+    fig = plt.figure(figsize=(9,7))
+    
+    sns.heatmap(
+        cf_matrix, 
+        annot=True, fmt='d',
+        xticklabels=labels,
+        yticklabels=labels
+    )
+    
+    plt.title(title)
+    
+    return fig
     
     

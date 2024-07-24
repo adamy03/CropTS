@@ -190,3 +190,30 @@ def dataset_split(data, labels, stratify=None):
     }
 
     return dataset
+
+def process_fused_data(data_root: str):
+    dfs = []
+    for ds in os.listdir(data_root):
+        if ds.endswith('.csv'):
+            print(ds)
+            dfs.append(pd.read_csv(os.path.join(data_root, ds)))
+    fused_data = pd.concat(dfs)
+
+    # Drop labels with less than 1000 samples and remove NOT_CROP        
+    fused_data = drop_labels(fused_data, min_labels=1000)
+    fused_data = fused_data.loc[fused_data['LABEL']!='NOT_CROP']
+    # columns = fused_data.columns
+
+    # Resample to <10 samples per point
+    dfs = []
+    for df in fused_data.groupby('POINT_ID'):
+        if len(df[1]) > 10:
+            dfs.append(df[1].sample(n=10, random_state=RANDOM_STATE, replace=False))
+        else:
+            dfs.append(df[1])
+            
+
+    fused_data = pd.concat(dfs)
+    print('Processed dataset length:', len(fused_data))
+    
+    return fused_data
